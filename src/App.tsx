@@ -46,7 +46,7 @@ function App() {
         title: item.title,
         placeOfOrigin: item.place_of_origin,
         artistDisplay: item.artist_display,
-        inscriptions: item.inscriptions,
+        inscriptions: item.inscriptions ? item.inscriptions : "N/A",
         dateStart: item.date_start,
         dateEnd: item.date_end,
       }));
@@ -176,7 +176,7 @@ function App() {
         paginator
         paginatorLeft={
           <div>
-            Showing {startIndex} to {endIndex} of {totalRecords}
+            Showing {startIndex} to {endIndex} of {totalRecords} entries
           </div>
         }
         paginatorTemplate="PrevPageLink PageLinks NextPageLink"
