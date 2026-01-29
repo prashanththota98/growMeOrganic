@@ -23,7 +23,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalRecords, setTotalRecords] = useState<number>(0);
   const overlayRef = useRef<OverlayPanel>(null);
-  const [selectedCount, setSelectedCount] = useState<number>(0);
+  const [selectedCount, setSelectedCount] = useState<number>();
   const [pendingGlobalCount, setPendingGlobalCount] = useState<number>(0);
   const globalCount = selectedId.size + pendingGlobalCount;
   console.log(`customSelection: ${selectedCount}`);
@@ -116,6 +116,7 @@ function App() {
               style={{ marginRight: "10px", outline: "none" }}
               value={selectedCount}
               onChange={(e) => setSelectedCount(Number(e.target.value))}
+              placeholder="eg 20"
             />
             <button
               type="button"
