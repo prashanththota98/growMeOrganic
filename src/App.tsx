@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { PrimeReactProvider, PrimeReactContext } from "primereact/api";
+import { useEffect, useRef, useState } from "react";
 import "primereact/resources/themes/saga-blue/theme.css";
 import "primereact/resources/primereact.min.css";
 import "primeicons/primeicons.css";
 import "./App.css";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
+import { OverlayPanel } from "primereact/overlaypanel";
 
 interface Artwork {
   id: number;
@@ -22,7 +22,15 @@ function App() {
   const [selectedId, setSelectedId] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalRecords, setTotalRecords] = useState<number>(0);
+  const overlayRef = useRef<OverlayPanel>(null);
+  const [selectedCount, setSelectedCount] = useState<number>(0);
+  const [pendingGlobalCount, setPendingGlobalCount] = useState<number>(0);
+  const globalCount = selectedId.size + pendingGlobalCount;
+  console.log(`customSelection: ${selectedCount}`);
+  console.log(`pending count ${pendingGlobalCount}`);
   const limit = 12;
+
+  console.log(selectedId);
 
   const fetchData = async (currentPage: number) => {
     try {
@@ -53,33 +61,125 @@ function App() {
   }, [currentPage]);
   console.log(artworkList);
 
-  const currentPageSelectedIds = artworkList.filter((art) =>
-    selectedId.has(art.id),
-  );
+  useEffect(() => {
+    if (pendingGlobalCount > 0 && artworkList.length > 0) {
+      setSelectedId((prev) => {
+        const updatedSelectedIds = new Set(prev);
+        const rowToSelect = Math.min(pendingGlobalCount, artworkList.length);
+        artworkList
+          .slice(0, rowToSelect)
+          .forEach((item) => updatedSelectedIds.add(item.id));
+        return updatedSelectedIds;
+      });
+      setPendingGlobalCount((prev) => Math.max(0, prev - artworkList.length));
+    }
+  }, [artworkList]);
 
-  const onSelectionChange = (e: any) => {
-    const updatedSelectedIds = new Set(selectedId);
+  const customCheckboxAndOverlayPanel = () => {
+    return (
+      <div className="headcheckbox">
+        <input
+          type="checkbox"
+          checked={
+            artworkList.length > 0 &&
+            artworkList.every((a) => selectedId.has(a.id))
+          }
+          onChange={(e) => {
+            setSelectedId((prev) => {
+              const updatedSelectedIds = new Set(prev);
+              if (e.target.checked) {
+                artworkList.forEach((a) => updatedSelectedIds.add(a.id));
+              } else {
+                artworkList.forEach((a) => updatedSelectedIds.delete(a.id));
+              }
+              return updatedSelectedIds;
+            });
+          }}
+        />
+        <button
+          type="button"
+          onClick={(e) => overlayRef.current?.toggle(e)}
+          style={{
+            cursor: "pointer",
+            backgroundColor: "transparent",
+            border: "none",
+          }}
+        >
+          <i className="pi pi-chevron-down" />
+        </button>
+        <OverlayPanel ref={overlayRef}>
+          <div>
+            <h4>Select Multiple Rows</h4>
+            <p>Enter no of rows to select across all pages</p>
+            <input
+              type="number"
+              style={{ marginRight: "10px", outline: "none" }}
+              value={selectedCount}
+              onChange={(e) => setSelectedCount(Number(e.target.value))}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedCount <= 0) return;
+                setSelectedId((prev) => {
+                  const updatedSelectedIds = new Set(prev);
+                  artworkList
+                    .slice(0, selectedCount)
+                    .forEach((item) => updatedSelectedIds.add(item.id));
 
-    const pageSelectedIds = new Set<number>(
-      (e.value || []).map((row: Artwork) => row.id),
-      console.log(e.value),
+                  const pendingCount = selectedCount - limit;
+                  setPendingGlobalCount(pendingCount);
+                  return updatedSelectedIds;
+                });
+                overlayRef.current?.hide();
+              }}
+            >
+              Submit
+            </button>
+          </div>
+        </OverlayPanel>
+      </div>
     );
-    artworkList.forEach((art) => {
-      if (pageSelectedIds.has(art.id)) {
-        updatedSelectedIds.add(art.id);
-      } else {
-        updatedSelectedIds.delete(art.id);
-      }
-    });
-    setSelectedId(updatedSelectedIds);
   };
+
+  const customCheckBoxesForRows = (rowData: Artwork) => {
+    return (
+      <input
+        type="checkbox"
+        checked={selectedId.has(rowData.id)}
+        onChange={() => {
+          setSelectedId((prev) => {
+            const updatedSelectedIds = new Set(prev);
+            if (updatedSelectedIds.has(rowData.id)) {
+              updatedSelectedIds.delete(rowData.id);
+            } else {
+              updatedSelectedIds.add(rowData.id);
+            }
+            return updatedSelectedIds;
+          });
+        }}
+      />
+    );
+  };
+
+  const startIndex = (currentPage - 1) * limit + 1;
+  const endIndex = Math.min(currentPage * limit, totalRecords);
+
   return (
     <div>
+      <p>Selected: {globalCount} rows</p>
       <DataTable
         value={artworkList}
+        key={currentPage + "-" + Array.from(selectedId).join(",")}
         rows={limit}
         dataKey="id"
         paginator
+        paginatorLeft={
+          <div>
+            Showing {startIndex} to {endIndex} of {totalRecords}
+          </div>
+        }
+        paginatorTemplate="PrevPageLink PageLinks NextPageLink"
         lazy
         totalRecords={totalRecords}
         first={(currentPage - 1) * limit}
@@ -88,12 +188,13 @@ function App() {
             setCurrentPage(e.page + 1);
           }
         }}
-        selection={currentPageSelectedIds}
-        onSelectionChange={onSelectionChange}
+        rowClassName={(rowData) =>
+          selectedId.has(rowData.id) ? "selected-row" : ""
+        }
       >
         <Column
-          selectionMode="multiple"
-          headerStyle={{ width: "3rem" }}
+          header={customCheckboxAndOverlayPanel}
+          body={(rowData) => customCheckBoxesForRows(rowData)}
         ></Column>
         <Column field="title" header="TITLE" />
         <Column field="placeOfOrigin" header="PLACE OF ORIGIN"></Column>
